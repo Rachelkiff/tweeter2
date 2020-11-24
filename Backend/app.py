@@ -58,4 +58,59 @@ def users():
        if(rows == 1):
           return Response("User creation successfull!", mimetype="text/html", status=201)
        else:
-          return Response("Username or email already exists!", mimetype="text/html", status=500)           
+          return Response("Username or email already exists!", mimetype="text/html", status=500) 
+    elif request.method == "PATCH":
+      conn = None
+      cursor = None 
+      login_token = request.json.get("login_token")
+      user_bio = request.json.get("bio")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        if login_token != "" and login_token != None:
+           cursor.execute("UPDATE user SET login_token=? WHERE id=?", [login_token, user_id,])
+        if user_bio != "" and user_bio != None:
+            cursor.execute("UPDATE user SET bio=? WHERE id=?", [user_bio, user_id,])     
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)     
+      finally:
+       if(cursor != None):
+         cursor.close()
+       if(conn != None):
+         conn.rollback()
+         conn.close()
+       if(rows == 1):
+          return Response("Updated Success!", mimetype="text/html", status=200)
+       else:
+          return return Response("There was an error!", mimetype="text/html", status=500)  
+    elif request.method == "DELETE":
+      conn = None
+      cursor = None 
+      user_id = request.json.get("id")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user WHERE id=?", [user_id,])   
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)     
+      finally:
+       if(cursor != None):
+         cursor.close()
+       if(conn != None):
+         conn.rollback()
+         conn.close()
+       if(rows == 1):
+          return Response("Delete Success", mimetype="text/html", status=204)
+       else:
+          return Response("Delete Failed!", mimetype="text/html", status=500)      
+
+
+         

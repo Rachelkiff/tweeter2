@@ -3,7 +3,7 @@ from flask import Flask, request, Response
 import json
 import dbcreds
 from flask_cors import CORS
-import result
+import random
 import string
 
 app = Flask(__name__)
@@ -55,8 +55,6 @@ def users():
         conn.commit()
         rows = cursor.rowcount
         if(rows == 1):
-          letters = string.ascli_letters
-          result_str = '',join(random.choice(letters)for i in range (40))
           userId = cursor.lastrowId
           cursor.execute("INSERT INTO user(login_token, userId) VALUES (?,?)", [result_string, userId,])
           conn.commit()
@@ -108,7 +106,15 @@ def users():
             cursor.execute("UPDATE user SET birthday=? WHERE userId=?", [user_birthday, user[0],])
         conn.commit()
         rows = cursor.rowcount
+        user = {
+            "username": username,
+            "password": password,
+            "email": email,
+            "bio": bio,
+            "birthday": birthday
+          }          
         cursor.execute
+
 
       except Exception as error:
         print("Something went wrong(This is LAZY!): ")

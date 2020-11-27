@@ -13,11 +13,13 @@ def generateToken():
   result_str = '',join(random.choice(letters)for i in range (40))
   return result_str
 @app.route("/api/users", methods =["GET", "POST", "PATCH", "DELETE"])
-def users():
+def usersendpoint():
     if request.method == "GET":
       conn = None
-      cursor = None 
-      users = None 
+      cursor = None
+      users = None
+      userId = request.json.get("userId")
+      rows = None
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
         cursor = conn.cursor()
@@ -25,7 +27,7 @@ def users():
           cursor.execute("SELECT * FROM user WHERE id = ?", [userId,])
         else:
           cursor.execute("SELECT * FROM user")
-          users = cursor.fetchall()
+        users = cursor.fetchall()
       except Exception as error:
         print("Something went wrong(This is LAZY!): ")
         print(error)   
@@ -56,15 +58,15 @@ def users():
         rows = cursor.rowcount
         if(rows == 1):
           userId = cursor.lastrowId
-          cursor.execute("INSERT INTO user(login_token, userId) VALUES (?,?)", [result_string, userId,])
+          cursor.execute("INSERT INTO user_session(login_token, userId) VALUES (?,?)", [result_string, userId,])
           conn.commit()
           rows = cursor.rowcount
           user = {
-            "username": username,
-            "password": password,
-            "email": email,
-            "bio": bio,
-            "birthday": birthday
+            "username": user_username,
+            "password": user_password,
+            "email": user_email,
+            "bio": user_bio,
+            "birthday": user_birthday
           }          
       except Exception as error:
         print("Something went wrong(This is LAZY!): ")
@@ -92,30 +94,22 @@ def users():
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
         cursor = conn.cursor()
-        cursor.execute("SELECT userId FROM user_session WHERE loginToken=?", [user_loginToken,])
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
         user = cursor.fetchone()
         if user_username != "" and user_username != None:
-           cursor.execute("UPDATE user SET username=? WHERE userId=?", [user_username, user[0],])
+           cursor.execute("UPDATE user SET username=? WHERE id=?", [user_username, user[0],])
         if user_password != "" and user_password != None:
-            cursor.execute("UPDATE user SET password=? WHERE userId=?", [user_password, user[0],])
+            cursor.execute("UPDATE user SET password=? WHERE id=?", [user_password, user[0],])
         if user_email != "" and user_email != None:
-            cursor.execute("UPDATE user SET email=? WHERE userId=?", [user_email, user[0],])
+            cursor.execute("UPDATE user SET email=? WHERE id=?", [user_email, user[0],])
         if user_bio != "" and user_bio != None:
-            cursor.execute("UPDATE user SET bio=? WHERE userId=?", [user_bio, user[0],])    
+            cursor.execute("UPDATE user SET bio=? WHERE id=?", [user_bio, user[0],])    
         if user_birthday != "" and user_birthday != None:
-            cursor.execute("UPDATE user SET birthday=? WHERE userId=?", [user_birthday, user[0],])
+            cursor.execute("UPDATE user SET birthday=? WHERE id=?", [user_birthday, user[0],])
         conn.commit()
         rows = cursor.rowcount
-        user = {
-            "username": username,
-            "password": password,
-            "email": email,
-            "bio": bio,
-            "birthday": birthday
-          }          
-        cursor.execute
-
-
+        cursor.execute("SELECT * FROM user WHERE id=?", [user[0],])
+        user = cursor.fetchone()
       except Exception as error:
         print("Something went wrong(This is LAZY!): ")
         print(error)     
@@ -126,6 +120,14 @@ def users():
          conn.rollback()
          conn.close()
        if(rows == 1):
+          user = {
+            "userId": user[0],
+            "username": user_username,
+            "password": user_password,
+            "email": user_email,
+            "bio": user_bio,
+            "birthday": user_birthday
+          }
           return Response("Updated Success!", mimetype="text/html", status=200)
        else:
           return Response("There was an error!", mimetype="text/html", status=500)  

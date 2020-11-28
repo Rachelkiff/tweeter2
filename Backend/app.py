@@ -72,12 +72,12 @@ def usersendpoint():
         print("Something went wrong(This is LAZY!): ")
         print(error)   
       finally:
-       if(cursor != None):
+        if(cursor != None):
          cursor.close()
-       if(conn != None):
+        if(conn != None):
          conn.rollback()
          conn.close()
-       if(rows == 1):
+        if(rows == 1):
           return Response("User creation successfull!", mimetype="text/html", status=201)
        else:
           return Response("Username or email already exists!", mimetype="text/html", status=500) 
@@ -114,12 +114,12 @@ def usersendpoint():
         print("Something went wrong(This is LAZY!): ")
         print(error)     
       finally:
-       if(cursor != None):
-         cursor.close()
-       if(conn != None):
+        if(conn != None):
+         conn.close()
+        if(conn != None):
          conn.rollback()
          conn.close()
-       if(rows == 1):
+        if(rows == 1):
           user = {
             "userId": user[0],
             "username": user_username,
@@ -129,16 +129,24 @@ def usersendpoint():
             "birthday": user_birthday
           }
           return Response("Updated Success!", mimetype="text/html", status=200)
-       else:
+        else:
           return Response("There was an error!", mimetype="text/html", status=500)  
     elif request.method == "DELETE":
       conn = None
       cursor = None 
       userId = request.json.get("id")
+      user_password = request.json.get("password")
+      user_loginToken = request.json.get("loginToken")
       rows = None
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
         cursor = conn.cursor()
+        if user_password != "" and user_password != None:
+          cursor.execute("SELECT password FROM user WHERE id=?", [userId]) 
+        if user_loginToken != "" and user_loginToken != None:
+          cursor.execute("SELECT loginToken FROM user_session WHERE id=?", [userId])
+
+
         cursor.execute("DELETE FROM user WHERE id=?", [userId,])   
         conn.commit()
         rows = cursor.rowcount
@@ -146,15 +154,58 @@ def usersendpoint():
         print("Something went wrong(This is LAZY!): ")
         print(error)     
       finally:
-       if(cursor != None):
+        if(cursor != None):
          cursor.close()
-       if(conn != None):
+        if(conn != None):
          conn.rollback()
          conn.close()
-       if(rows == 1):
-          return Response("Delete Success", mimetype="text/html", status=204)
+        if(rows == 1):
+          return Response("Delete Success!", mimetype="text/html", status=204)
        else:
-          return Response("Delete Failed!", mimetype="text/html", status=500)      
+          return Response("Login token or password not valid!", mimetype="text/html", status=500)     
+@app.route("/api/login", methods =["POST", "DELETE"])      
+def loginendpoint():  
+    if request.method == "POST": 
+      conn = None
+      cursor = None 
+      user_password = request.json.get("password")
+      user_email = request.json.get("email")
+      user_loginToken = request.json.get("loginToken")
+      rows = None
+      user = None
+      user_id = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM user WHERE email=? AND password=? (email, password,)", [user_email, user_password,])
+        user_id = cursor.fetchall()[0][0]
+        print(user_id)
+        rows = cursor.rowcount
+        if(rows == 1):
+          userId = cursor.lastrowId
+          cursor.execute("INSERT INTO user_session(login_token, userId) VALUES (?,?)", [result_string, userId,])
+          conn.commit()
+          rows = cursor.rowcount
+          user = cursor.fetchall()
+          user = {
+            "username": user_username,
+            "password": user_password,
+          }          
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("User login successfull!", mimetype="text/html", status=201)
+       else:
+          return Response("Information entered is not valid!", mimetype="text/html", status=500) 
+
+
 
 
          

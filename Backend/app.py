@@ -79,7 +79,7 @@ def usersendpoint():
          conn.close()
         if(rows == 1):
           return Response("User creation successfull!", mimetype="text/html", status=201)
-       else:
+        else:
           return Response("Username or email already exists!", mimetype="text/html", status=500) 
     elif request.method == "PATCH":
       conn = None
@@ -134,20 +134,16 @@ def usersendpoint():
     elif request.method == "DELETE":
       conn = None
       cursor = None 
-      userId = request.json.get("id")
       user_password = request.json.get("password")
       user_loginToken = request.json.get("loginToken")
       rows = None
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
         cursor = conn.cursor()
-        if user_password != "" and user_password != None:
-          cursor.execute("SELECT password FROM user WHERE id=?", [userId]) 
-        if user_loginToken != "" and user_loginToken != None:
-          cursor.execute("SELECT loginToken FROM user_session WHERE id=?", [userId])
-
-
-        cursor.execute("DELETE FROM user WHERE id=?", [userId,])   
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchone()
+        print(user)
+        cursor.execute("DELETE FROM user WHERE id=? AND password=?", [user[0], user_password,])
         conn.commit()
         rows = cursor.rowcount
       except Exception as error:
@@ -161,7 +157,7 @@ def usersendpoint():
          conn.close()
         if(rows == 1):
           return Response("Delete Success!", mimetype="text/html", status=204)
-       else:
+        else:
           return Response("Login token or password not valid!", mimetype="text/html", status=500)     
 @app.route("/api/login", methods =["POST", "DELETE"])      
 def loginendpoint():  
@@ -170,7 +166,6 @@ def loginendpoint():
       cursor = None 
       user_password = request.json.get("password")
       user_email = request.json.get("email")
-      user_loginToken = request.json.get("loginToken")
       rows = None
       user = None
       user_id = None
@@ -182,15 +177,19 @@ def loginendpoint():
         print(user_id)
         rows = cursor.rowcount
         if(rows == 1):
-          userId = cursor.lastrowId
-          cursor.execute("INSERT INTO user_session(login_token, userId) VALUES (?,?)", [result_string, userId,])
+          cursor.execute("INSERT INTO user_session(login_token, userId) VALUES (?,?)", [generateToken, userId,])
           conn.commit()
           rows = cursor.rowcount
           user = cursor.fetchall()
           user = {
+            "userId": user[0],
             "username": user_username,
             "password": user_password,
-          }          
+            "email": user_email,
+            "bio": user_bio,
+            "birthday": user_birthday,
+            "login_token": login_token
+          }
       except Exception as error:
         print("Something went wrong(This is LAZY!): ")
         print(error)   
@@ -202,8 +201,127 @@ def loginendpoint():
          conn.close()
         if(rows == 1):
           return Response("User login successfull!", mimetype="text/html", status=201)
-       else:
+        else:
           return Response("Information entered is not valid!", mimetype="text/html", status=500) 
+    elif request.method == "DELETE":
+      conn = None
+      cursor = None 
+      user = None
+      user_loginToken = request.json.get("loginToken")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_session WHERE login_token=?", [user_loginToken,])
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)     
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("Delete Success!", mimetype="text/html", status=204)
+        else:
+          return Response("Login token invalid!", mimetype="text/html", status=500) 
+@app.route("/api/follow", methods =["GET","POST", "DELETE"])  
+def followendpoint():  
+    if request.method == "GET":
+      conn = None
+      cursor = None
+      users = None
+      userId = request.args.get("userId")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        if userId != None:
+          cursor.execute("SELECT user.id, user.email, user.username, user.bio, user.birthday FROM user INNER JOIN follow ON user.id = follow.follow_id WHERE follow.follow_id =?", [userId,])
+          users = cursor.fetchall()
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+          cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(users != None or users == []):
+          for user in users:
+            user = {
+            "userId": user[0],
+            "username": user_username[2],
+            "email": user_email[1],
+            "bio": user_bio[3],
+            "birthday": user_birthday[4],
+          }
+            user.append[users]
+          return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+        else:
+          return Response("UserId does not exist.", mimetype="text/html", status=500) 
+    if request.method == "POST": 
+      conn = None
+      cursor = None 
+      user_loginToken = request.json.get("loginToken")
+      follow_id = request.json.get("follow_id")
+      rows = None
+      user_id = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT userId FROM user u INNER JOIN user_session us ON u.userId=us.userId WHERE loginToken=?", [user_logintoken,])
+        user_id = cursor.fetchall()[0][0]
+        rows = cursor.rowcount
+        if(rows == 1):
+          cursor.execute("INSERT INTO follow(userId, followId) VALUES (?,?)", [user_id, follow_id,])
+          conn.commit()
+          rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("User follow successfull!", mimetype="text/html", status=201)
+        else:
+          return Response("There was an error!", mimetype="text/html", status=500) 
+    elif request.method == "DELETE":
+      conn = None
+      cursor = None 
+      user = None
+      user_loginToken = request.json.get("loginToken")
+      follow_id = request.json.get("follow_id")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_session WHERE login_token=?", [user_loginToken,])
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)     
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("Delete Success!", mimetype="text/html", status=204)
+        else:
+          return Response("Login token invalid!", mimetype="text/html", status=500)             
+
+         
 
 
 

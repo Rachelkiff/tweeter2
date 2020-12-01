@@ -319,7 +319,72 @@ def followendpoint():
         if(rows == 1):
           return Response("Delete Success!", mimetype="text/html", status=204)
         else:
-          return Response("Login token invalid!", mimetype="text/html", status=500)             
+          return Response("Login token invalid!", mimetype="text/html", status=500) 
+@app.route("/api/followers", methods =["GET"])  
+def followersendpoint():  
+    if request.method == "GET":
+      conn = None
+      cursor = None
+      users = None
+      userId = request.args.get("userId")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        if userId != None:
+          cursor.execute("SELECT user.id, user.email, user.username, user.bio, user.birthday FROM user INNER JOIN follow ON user.id = follow.follow_id WHERE follow.follow_id =?", [userId,])
+          users = cursor.fetchall()
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+          cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(users != None or users == []):
+          for user in users:
+            user = {
+            "userId": user[0],
+            "username": user_username[2],
+            "email": user_email[1],
+            "bio": user_bio[3],
+            "birthday": user_birthday[4],
+          }
+            user.append[users]
+          return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+        else:
+          return Response("UserId does not exist.", mimetype="text/html", status=500)  
+@app.route("/api/tweet", methods =["GET", "POST", "PATCH", "DELETE"])
+def tweetendpoint():
+    if request.method == "GET":
+      conn = None
+      cursor = None
+      users = None
+      userId = request.json.get("userId")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        if userId != "" and userId != None:
+          cursor.execute("SELECT * FROM user WHERE id = ?", [userId,])
+        else:
+          cursor.execute("SELECT * FROM user")
+        users = cursor.fetchall()
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(users != None):
+            return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+        else:
+            return Response("UserId does not exist.", mimetype="text/html", status=500)                                
 
          
 

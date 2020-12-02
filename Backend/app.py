@@ -5,6 +5,7 @@ import dbcreds
 from flask_cors import CORS
 import random
 import string
+import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -384,7 +385,100 @@ def tweetendpoint():
         if(users != None):
             return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
         else:
-            return Response("UserId does not exist.", mimetype="text/html", status=500)                                
+            return Response("UserId does not exist.", mimetype="text/html", status=500)  
+    elif request.method == "POST": 
+      conn = None
+      cursor = None 
+      user_loginToken = request.json.get("loginToken")
+      tweet_content = request.json.get("content")
+      created_at = datetime.date.today()
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchone()
+        print(user)
+        cursor.execute("INSERT INTO tweet(user_id, content, created_at) VALUES (?,?,?)", [user[0], tweet_content, created_at])
+        conn.commit()
+        rows = cursor.rowcount
+        tweetId = cursor.lastrowId        
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("Tweet was created successfully!", mimetype="text/html", status=201)
+        else:
+          return Response("Login Token is not valid!", mimetype="text/html", status=500) 
+    elif request.method == "PATCH":
+        conn = None
+        cursor = None                                             
+        user_loginToken = request.json.get("loginToken")
+        
+        tweet_content = request.json.get("content")
+        rows = None
+        try:
+         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+         cursor = conn.cursor() 
+         cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+         user = cursor.fetchone()
+         if tweet_content != "" and tweet_content != None:
+         cursor.execute("UPDATE tweet SET content=? WHERE id=?", [user[0], ])
+       
+         cursor.execute("INSERT INTO tweet(user_id, content, created_at) VALUES (?,?,?)", [user[0], tweet_content, created_at])
+         conn.commit()
+         rows = cursor.rowcount
+         tweetId = cursor.lastrowId        
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("Tweet was created successfully!", mimetype="text/html", status=201)
+        else:
+          return Response("Login Token is not valid!", mimetype="text/html", status=500) 
+    elif request.method == "DELETE":
+      conn = None
+      cursor = None 
+      user = None
+      user_loginToken = request.json.get("loginToken")
+      tweet_id = request.json.get("tweet_id")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchone()[0]
+        cursor.execute("DELETE FROM tweet WHERE id=?", [user[0], tweet_id])
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)     
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("Delete Success!", mimetype="text/html", status=204)
+        else:
+          return Response("Invalid login token!", mimetype="text/html", status=500)       
+
+         
+
 
          
 

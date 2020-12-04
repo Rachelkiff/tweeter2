@@ -437,7 +437,7 @@ def tweetendpoint():
         cursor.execute("UPDATE tweet SET content=? WHERE id=? AND user_id=?" , [tweet_content, user[0], ])
         conn.commit()
         rows = cursor.rowcount
-        except Exception as error:
+       except Exception as error:
         print("Something went wrong(This is LAZY!): ")
         print(error)   
        finally:
@@ -468,7 +468,7 @@ def tweetendpoint():
         cursor.execute("DELETE FROM tweet WHERE id=? AND userId=?", [tweet_id, user[0],])
         conn.commit()
         rows = cursor.rowcount
-        except Exception as error:
+       except Exception as error:
         print("Something went wrong(This is LAZY!): ")
         print(error)   
        finally:
@@ -491,7 +491,7 @@ def commentendpoint():
       conn = None
       cursor = None
       users = None
-      tweet_id = request.json.get("tweet_id")
+      tweet_id = request.args.get("tweet_id")
       rows = None
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
@@ -511,8 +511,8 @@ def commentendpoint():
          conn.rollback()
          conn.close()
         if(users != None):
-          if(users != None or users == []):
-          for user in users:
+         if(users != None or users == []):
+           for user in users:
             user = {
             "commentId": comment_id[0],
             "tweetId": tweet_id[2],
@@ -525,7 +525,7 @@ def commentendpoint():
             return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
         else:
             return Response("Tweet id does not exist!", mimetype="text/html", status=500)  
-    if request.method == "POST":
+    elif request.method == "POST":
       conn = None
       cursor = None
       users = None
@@ -536,15 +536,47 @@ def commentendpoint():
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        cursor.execute("SELECT userId FROM user_session WHERE login_token=?", [user_loginToken,])
         user = cursor.fetchall()
-        cursor.execute("DELETE FROM tweet WHERE id=? AND userId=?", [tweet_id, user[0],])
-        conn.commit()
-        rows = cursor.rowcount
-        except Exception as error:
+        if user != None:
+          cursor.execute("INSERT INTO comment(tweetId, userId, content) VALUES(?,?,?)", [tweet_id, user[0], content,])
+          conn.commit()
+          rows = cursor.rowcount
+      except Exception as error:
         print("Something went wrong(This is LAZY!): ")
         print(error)   
-       finally:
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1)
+          return Response("Comment commented!", mimetype="text/html", status=204)
+        else:
+          return Response("There is an error!", mimetype="text/html", status=500)
+    elif request.method == "PATCH":
+      conn = None
+      cursor = None
+      users = None
+      user_loginToken = request.json.get("loginToken")
+      commentId = request.json.get("comment_id")
+      comment_content = request.json.get("comment_content")
+      rows = None   
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT userId FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchall()
+        cursor.execute("UPDATE comment SET content=? WHERE id=? AND userId=?", [comment_content, comment_id, user[0],])
+        conn.commit()
+        rows = cursor.rowcount
+        cursor.execute("SELECT c. *, u.username FROM user u INNER JOIN comment c ON u.id = c.userId WHERE c.id=?",[comment_id,])
+        user = cursor.fetchall()
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
         if(cursor != None):
          cursor.close()
         if(conn != None):
@@ -552,12 +584,176 @@ def commentendpoint():
          conn.close()
         if(rows == 1):
           user = {
-            "tweetId": tweetId,
-            "content": tweet_content,
+            "commentId": comment_id,
+            "tweetId": user[0][1],
+            "userId": user[0][0],
+            "username":user[0][0],
+            "content": comment_content,
+            "createdAt": created_at
            }
+          return Response("New comment created!", mimetype="text/html", status=200)
+        else:
+          return Response("There is an error!", mimetype="text/html", status=500) 
+    elif request.method == "Delete":
+       conn = None
+       cursor = None 
+       user_loginToken = request.json.get("loginToken")
+       commentId = request.json.get("comment_id")
+       rows = None
+       try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchone()
+        cursor.execute("DELETE FROM comment WHERE id=? AND userId=?", [comment_id, user[0],])
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
           return Response("Deleted successfully!", mimetype="text/html", status=204)
         else:
-          return Response("Login Token is not valid!", mimetype="text/html", status=500)       
+          return Response("There is an error!", mimetype="text/html", status=500)
+@app.route("/api/tweetlikes", methods =["GET", "POST", "DELETE"])
+def tweetlikesendpoint():
+    if request.method == "GET":
+      conn = None
+      cursor = None
+      users = None
+      tweet_id = request.args.get("tweet_id")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        users = cursor.fetchall()
+        print(user)
+        if user != None:
+          cursor.execute("INSERT into tweet_like(tweetId, userId) VALUES(?,?)", [tweet_id, user[0],])
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(users != None):
+          if(users != None or users == []):
+          for user in users:
+            user = {
+            "tweetId": tweet_id[0],
+            "userId": user_id[1],
+            "username": user_username[2]
+            }
+            user.append[users]
+            return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+        else:
+            return Response("Tweet id does not exist!", mimetype="text/html", status=500) 
+    if request.method == "POST": 
+      conn = None
+      cursor = None
+      users = None
+      tweetId = None
+      createdAt = None
+      user_loginToken = request.json.get("loginToken")
+      tweet_id = request.json.get("tweet_id")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.executecursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchall()
+        print(user)
+        if user != None:
+          cursor.execute("INSERT into tweet_like(tweetId, userId) VALUES(?,?)", [tweet_id, user[0],])
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(users != None)
+            return Response(json.dumps("tweet_like", default=str), mimetype="application/json", status=200)
+        else:
+            return Response("Tweet id does not exist!", mimetype="text/html", status=500)  
+    elif request.method == "Delete":
+       conn = None
+       cursor = None 
+       user_loginToken = request.json.get("loginToken")
+       tweetId = request.json.get("tweet_id")
+       rows = None
+       try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM user_session WHERE login_token=?", [user_loginToken,])
+        user = cursor.fetchone()
+        cursor.execute("DELETE FROM tweet_like WHERE tweetId=? AND userId=?", [TWEET_id, user[0],])
+        conn.commit()
+        rows = cursor.rowcount
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(rows == 1):
+          return Response("Deleted successfully!", mimetype="text/html", status=204)
+        else:
+          return Response("There is an error!", mimetype="text/html", status=500)
+@app.route("/api/commentlikes", methods =["GET", "POST", "DELETE"])
+def commentlikesendpoint():
+    if request.method == "GET":
+      conn = None
+      cursor = None
+      users = None
+      comment_id = request.args.get("comment_id")
+      rows = None
+      try:
+        conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
+        cursor = conn.cursor()
+        if commentId != None and commentId != "":
+        cursor.execute("SELECT c.comment, c.userId, u.username FROM comment_like c INNER JOIN user u ON u.id = c.user WHERE c.commentId=?", [comment_id,])
+        users = cursor.fetchall()
+        print(user)
+      except Exception as error:
+        print("Something went wrong(This is LAZY!): ")
+        print(error)   
+      finally:
+        if(cursor != None):
+         cursor.close()
+        if(conn != None):
+         conn.rollback()
+         conn.close()
+        if(users != None):
+          if(users != None or users == []):
+          for user in users:
+            user = {
+            "commentId": comment_id[0],
+            "userId": user_id[1],
+            "username": user_username[2]
+            }
+            user.append[users]
+            return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+        else:
+            return Response("Tweet id does not exist!", mimetype="text/html", status=500)
+
+
+
 
 
 

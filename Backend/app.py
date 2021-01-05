@@ -10,8 +10,8 @@ import datetime
 app = Flask(__name__)
 CORS(app)
 def generateToken():
-  letters = string.ascli_letters
-  result_str = '',join(random.choice(letters)for i in range (40))
+  letters = string.ascii_letters
+  result_str = ''.join(random.choice(letters)for i in range (40))
   return result_str
 
 # Users Endpoint
@@ -21,7 +21,7 @@ def usersendpoint():
       conn = None
       cursor = None
       users = None
-      userId = request.json.get("userId")
+      userId = request.args.get("userId")
       rows = None
       try:
         conn = mariadb.connect(user=dbcreds.user, password=dbcreds.password, host=dbcreds.host, port=dbcreds.port, database=dbcreds.database,)
@@ -40,7 +40,14 @@ def usersendpoint():
         if(conn != None):
          conn.rollback()
          conn.close()
-        if(users != None):
+        if(rows):
+          user = {
+            "userId": row[0],
+            "email": row[3],
+            "username": row[1],
+            "bio": row[4],
+            "birthday": row[5]
+          }           
             return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
         else:
             return Response("UserId does not exist.", mimetype="text/html", status=500) 
@@ -61,7 +68,7 @@ def usersendpoint():
         rows = cursor.rowcount
         if(rows == 1):
           userId = cursor.lastrowId
-          cursor.execute("INSERT INTO user_session(login_token, userId) VALUES (?,?)", [result_string, userId,])
+          cursor.execute("INSERT INTO user_session(login_token, userId) VALUES (?,?)", [generateToken(), userId,])
           conn.commit()
           rows = cursor.rowcount
           user = {
@@ -81,7 +88,7 @@ def usersendpoint():
          conn.rollback()
          conn.close()
         if(rows == 1):
-          return Response("User creation successfull!", mimetype="text/html", status=201)
+          return Response(json.dumps(user, default=str), mimetype="text/html", status=201)
         else:
           return Response("Username or email already exists!", mimetype="text/html", status=500) 
     elif request.method == "PATCH":
@@ -598,8 +605,8 @@ def commentendpoint():
         if(rows == 1):
           user = {
             "commentId": comment_id,
-            "tweetId": user[0][1],
-            "userId": user[0][0],
+            "tweetId": user[0][4],
+            "userId": user[0][3],
             "username":user[0][0],
             "content": comment_content,
             "createdAt": created_at
